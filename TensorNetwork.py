@@ -1,10 +1,15 @@
 import numpy as np
 import torch
 
-from PermList import *
-
 def normalize(x):
     pass
+
+def inverse_permutation(perm):
+    if not isinstance(perm, torch.Tensor):
+        perm = torch.Tensor(perm)
+    inv = torch.empty_like(perm)
+    inv[perm] = torch.arange(perm.size(0), device=perm.device)
+    return inv.tolist()
 
 class PureState():
     def __init__(self, tensor=None, nq=None):
@@ -30,5 +35,4 @@ class PureState():
         state2_ = gate.reshape(-1, 2**n_act).mm(state1[:, :, -1])
         state1 = torch.cat([state1_, state2_.reshape(state2_.shape + (1,))], dim = -1)
         state1 = state1.reshape(shape)
-        perm_ = PermList(perm)
-        self.tensor = state1.permute(perm_.inverse())
+        self.tensor = state1.permute(inverse_permutation(perm))
