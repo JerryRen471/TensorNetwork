@@ -15,7 +15,7 @@ def ten_perm(x, pos, pos_first=False):
         perm = perm + pos
     return x.permute(perm), pos_dim, shape
 
-def tmul(x, y, pos_x, pos_y):
+def tmul(x, y, pos_x=[], pos_y=[]):
     x_new, mul_dim_x, shape_x = ten_perm(x, pos_x)
     y_new, mul_dim_y, shape_y = ten_perm(y, pos_y, pos_first=True)
 
@@ -35,7 +35,7 @@ class HeisenbergModel:
         I2 = tc.tensor([[1., 0.], [0., 1.]], dtype=tc.complex64, device=device)
         Hij = 0
         for i in range(3):
-            Hij += J[i]*tc.kron(S[i], S[i]) + h[i]*tc.kron(S[i], I2) + h[i]*tc.kron(I2, S[i])
+            Hij += J[i]*tmul(S[i], S[i]) + h[i]*tmul(S[i], I2)
         self.Hij = Hij
         pass
 
@@ -45,8 +45,9 @@ if __name__ == '__main__':
     h = [0, 0, 1]
     model = HeisenbergModel(num_sys, J, h)
     print(model.Hij)
-    x = tc.ones([2, 3, 4, 5, 2])
-    y = tc.ones([2, 5, 4, 3])
-    print(x.shape, '\n', y.shape)
-    z = tmul(x, y, pos_x=[0, 2, 3], pos_y=[0, 2, 1])
-    print(z.shape)
+    print(model.Hij.shape)
+    # x = tc.ones([2, 3])
+    # y = tc.ones([2])
+    # print(x.shape, '\n', y.shape)
+    # z = tmul(x, y, pos_x=[], pos_y=[])
+    # print(z)
