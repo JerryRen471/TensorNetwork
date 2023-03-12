@@ -1,28 +1,9 @@
 import torch as tc
+import numpy as np
+import scipy as sp
+from scipy.sparse.linalg import LinearOperator
 
-def ten_perm(x, pos, pos_first=False):
-    perm = list(_ for _ in range(len(x.shape)))
-    pos_dim = 1
-    shape = list(x.shape)
-    for _ in pos:
-        perm.remove(_)
-        d_ = x.shape[_]
-        pos_dim *= d_
-        shape.remove(d_)
-    if pos_first:
-        perm = pos + perm
-    else:
-        perm = perm + pos
-    return x.permute(perm), pos_dim, shape
-
-def tmul(x, y, pos_x=[], pos_y=[]):
-    x_new, mul_dim_x, shape_x = ten_perm(x, pos_x)
-    y_new, mul_dim_y, shape_y = ten_perm(y, pos_y, pos_first=True)
-
-    shape = shape_x + shape_y
-    result = x_new.reshape(-1, mul_dim_x).mm(y_new.reshape(mul_dim_y, -1))
-    result = result.reshape(shape)
-    return result
+from Tools import *
 
 class HeisenbergModel:
     def __init__(self, num_sys, J=[0, 0, 1], h=[0, 0, 1], device = 'cpu'):
@@ -34,18 +15,53 @@ class HeisenbergModel:
         S = [Sx, Sy, Sz]
         I2 = tc.tensor([[1., 0.], [0., 1.]], dtype=tc.complex64, device=device)
         Hij = 0
+        Hi = 0
         for i in range(3):
-            Hij += J[i]*tmul(S[i], S[i]) + h[i]*tmul(S[i], I2)
+            Hij += J[i]*tmul(S[i], S[i]) + h[i]*tmul(I2, S[i])
+            Hi += h[i]*S[i]
         self.Hij = Hij
+        self.Hi = Hi
         pass
 
+    def H_function(self, phi):
+        phi_1 = tc.from_numpy(phi)
+        n = int(np.log2(len(phi_1)))
+        shape = [2 for _ in range(n)]
+        phi_1 = phi_1.reshape(shape)
+        phi_2 = 0
+        for i in range(n-1):
+            phi_3 = tmul(self.Hij, phi_1, pos_x=[1, 3], pos_y=[i, i+1])
+            perm = [_ for _ in range(2, i+2)] + [0, 1] + [_ for _ in range(i+2, n)]
+            phi_3 = phi_3.permute(perm)
+            phi_2 += phi_3
+        phi_2 += tmul(self.Hi, phi_1, pos_x=[1], pos_y=[0])
+        return phi_2.reshape(2**n, -1).numpy()
+    
+    def H_matmat(self, A):
+        B = np.zeros(A.shape, dtype=np.complex64)
+        for i in range(A.shape[1]):
+            B[:, [i]] = self.H_function(A[:, i])
+        return B
+
 if __name__ == '__main__':
-    num_sys = 6
+    num_sys = 3
     J = [0, 0, 2]
     h = [0, 0, 1]
     model = HeisenbergModel(num_sys, J, h)
     print(model.Hij)
     print(model.Hij.shape)
+    phi = tc.randn(2**num_sys, dtype=tc.complex64)
+    print(phi.shape)
+    H = LinearOperator(
+        shape = (2**num_sys, 2**num_sys),
+        matvec = model.H_function,
+        matmat = model.H_matmat,
+        dtype = np.complex64
+        )
+    e_vals, e_vecs = sp.linalg.eig(H.matmat(np.eye(2**num_sys, dtype=np.complex64)))
+    print(e_vals)
+    print(e_vecs[0])
+    print(model.H_function(e_vecs[0]))
     # x = tc.ones([2, 3])
     # y = tc.ones([2])
     # print(x.shape, '\n', y.shape)
