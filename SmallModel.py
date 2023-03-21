@@ -57,7 +57,6 @@ class HeisenbergModel:
             if _%1000 == 0:
                 print('step={}: phi={}, E={}'.format(_, phi0, loss))
         return phi0, loss
-        pass
 
 if __name__ == '__main__':
     num_sys = 3
